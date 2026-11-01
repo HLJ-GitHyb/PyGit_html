@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PyGit - 图形化 Git 客户端</title>
+<meta name="description" content="基于 Python + Tkinter 构建的全功能图形化 Git 客户端，零外部依赖，开箱即用。">
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2333;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text2: #8b949e;
+  --accent: #58a6ff;
+  --accent2: #3fb950;
+  --accent3: #d2a8ff;
+  --gradient1: linear-gradient(135deg, #58a6ff 0%, #3fb950 100%);
+  --gradient2: linear-gradient(135deg, #1f6feb 0%, #238636 100%);
+  --radius: 12px;
+  --shadow: 0 8px 32px rgba(0,0,0,.3);
+}
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.7;
+  overflow-x: hidden;
+}
+a { color: var(--accent); text-decoration: none; transition: color .2s; }
+a:hover { color: #79c0ff; }
+img { max-width: 100%; display: block; }
+
+/* ===== Utilities ===== */
+.container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+.section-title {
+  font-size: 2rem; font-weight: 700; text-align: center; margin-bottom: 12px;
+  background: var(--gradient1); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.section-sub { text-align: center; color: var(--text2); font-size: 1.05rem; margin-bottom: 48px; }
+.badge {
+  display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: .8rem;
+  font-weight: 600; letter-spacing: .5px;
+}
+
+/* ===== Nav ===== */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(13,17,23,.85); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border);
+}
+nav .container { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+.nav-brand { display: flex; align-items: center; gap: 10px; font-size: 1.25rem; font-weight: 700; color: var(--text); }
+.nav-brand svg { width: 32px; height: 32px; }
+.nav-links { display: flex; gap: 28px; }
+.nav-links a { color: var(--text2); font-size: .9rem; font-weight: 500; transition: color .2s; }
+.nav-links a:hover { color: var(--text); }
+.nav-gh {
+  display: flex; align-items: center; gap: 6px; padding: 7px 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-size: .85rem; font-weight: 500; transition: background .2s;
+}
+.nav-gh:hover { background: var(--surface2); color: var(--text); }
+
+/* ===== Hero ===== */
+.hero {
+  padding: 160px 0 100px; text-align: center; position: relative; overflow: hidden;
+}
+.hero::before {
+  content: ''; position: absolute; top: -120px; left: 50%; transform: translateX(-50%);
+  width: 800px; height: 800px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(88,166,255,.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-badge {
+  background: rgba(88,166,255,.12); color: var(--accent); border: 1px solid rgba(88,166,255,.25);
+  margin-bottom: 24px;
+}
+.hero h1 {
+  font-size: 3.6rem; font-weight: 800; line-height: 1.15; margin-bottom: 20px;
+  background: linear-gradient(135deg, #fff 0%, #8b949e 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.hero h1 span {
+  background: var(--gradient1); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero p { color: var(--text2); font-size: 1.2rem; max-width: 580px; margin: 0 auto 36px; }
+.hero-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px; padding: 13px 28px;
+  background: var(--gradient2); color: #fff; border-radius: 10px; font-weight: 600;
+  font-size: .95rem; border: none; cursor: pointer; transition: transform .15s, box-shadow .2s;
+  box-shadow: 0 4px 16px rgba(31,111,235,.35);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(31,111,235,.5); color: #fff; }
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 8px; padding: 13px 28px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 10px; font-weight: 600; font-size: .95rem; transition: background .2s, border-color .2s;
+}
+.btn-secondary:hover { background: var(--surface2); border-color: var(--text2); color: var(--text); }
+.hero-stats { display: flex; justify-content: center; gap: 48px; margin-top: 56px; }
+.hero-stat { text-align: center; }
+.hero-stat .num { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+.hero-stat .label { font-size: .82rem; color: var(--text2); margin-top: 2px; }
+
+/* ===== Mock Window ===== */
+.mock-window {
+  max-width: 880px; margin: 64px auto 0; border-radius: var(--radius); overflow: hidden;
+  border: 1px solid var(--border); box-shadow: var(--shadow);
+  background: var(--surface);
+}
+.mock-titlebar {
+  display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+  background: var(--surface2); border-bottom: 1px solid var(--border);
+}
+.mock-dot { width: 12px; height: 12px; border-radius: 50%; }
+.mock-dot.r { background: #f85149; }
+.mock-dot.y { background: #d29922; }
+.mock-dot.g { background: #3fb950; }
+.mock-titlebar span { flex: 1; text-align: center; font-size: .8rem; color: var(--text2); margin-right: 44px; }
+.mock-body { padding: 20px; font-family: "Cascadia Code", "Fira Code", monospace; font-size: .82rem; line-height: 1.8; }
+.mock-body .line { display: flex; gap: 8px; }
+.mock-body .prompt { color: var(--accent2); }
+.mock-body .cmd { color: var(--text); }
+.mock-body .flag { color: var(--accent); }
+.mock-body .str { color: #ffa657; }
+.mock-body .comment { color: var(--text2); }
+.mock-body .ok { color: var(--accent2); }
+.mock-body .hl { color: var(--accent3); }
+.typing-cursor {
+  display: inline-block; width: 8px; height: 16px; background: var(--accent);
+  animation: blink 1s step-end infinite; vertical-align: text-bottom; margin-left: 2px;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ===== Features Grid ===== */
+.features { padding: 100px 0; }
+.features-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+.feature-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 28px; transition: transform .2s, border-color .3s, box-shadow .3s;
+  position: relative; overflow: hidden;
+}
+.feature-card:hover {
+  transform: translateY(-4px); border-color: var(--accent);
+  box-shadow: 0 8px 24px rgba(88,166,255,.1);
+}
+.feature-card::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--gradient1); opacity: 0; transition: opacity .3s;
+}
+.feature-card:hover::after { opacity: 1; }
+.feature-icon {
+  width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center;
+  justify-content: center; font-size: 1.3rem; margin-bottom: 16px;
+}
+.feature-icon.blue { background: rgba(88,166,255,.12); color: var(--accent); }
+.feature-icon.green { background: rgba(63,185,80,.12); color: var(--accent2); }
+.feature-icon.purple { background: rgba(210,168,255,.12); color: var(--accent3); }
+.feature-icon.orange { background: rgba(255,166,87,.12); color: #ffa657; }
+.feature-icon.red { background: rgba(248,81,73,.12); color: #f85149; }
+.feature-icon.teal { background: rgba(63,185,180,.12); color: #3fb9b4; }
+.feature-icon.pink { background: rgba(219,97,162,.12); color: #db61a2; }
+.feature-icon.yellow { background: rgba(210,153,34,.12); color: #d29922; }
+.feature-card h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 8px; }
+.feature-card p { color: var(--text2); font-size: .88rem; line-height: 1.6; }
+.feature-tag {
+  display: inline-block; margin-top: 12px; padding: 2px 10px; border-radius: 12px;
+  font-size: .72rem; font-weight: 500;
+  background: rgba(88,166,255,.08); color: var(--accent); border: 1px solid rgba(88,166,255,.15);
+}
+
+/* ===== Architecture ===== */
+.architecture { padding: 100px 0; }
+.arch-diagram {
+  max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 0;
+  align-items: center;
+}
+.arch-row { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; width: 100%; }
+.arch-box {
+  flex: 1; min-width: 180px; max-width: 220px; padding: 24px 16px; text-align: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  transition: border-color .3s, box-shadow .3s;
+}
+.arch-box:hover { border-color: var(--accent); box-shadow: 0 0 20px rgba(88,166,255,.08); }
+.arch-box .icon { font-size: 1.8rem; margin-bottom: 8px; }
+.arch-box h4 { font-size: .95rem; font-weight: 600; margin-bottom: 4px; }
+.arch-box p { font-size: .78rem; color: var(--text2); }
+.arch-arrow {
+  display: flex; flex-direction: column; align-items: center; padding: 12px 0;
+  color: var(--text2); font-size: .78rem; gap: 2px;
+}
+.arch-arrow svg { width: 24px; height: 24px; fill: var(--accent); }
+.arch-arrow .label { font-weight: 500; color: var(--accent); font-family: monospace; }
+.arch-connector { width: 100%; display: flex; align-items: center; justify-content: center; padding: 4px 0; }
+.arch-connector svg { width: 200px; height: 28px; }
+
+/* ===== Tech Stack ===== */
+.tech { padding: 80px 0; }
+.tech-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.tech-chip {
+  display: flex; align-items: center; gap: 8px; padding: 10px 20px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 40px;
+  font-size: .88rem; font-weight: 500; transition: border-color .3s, background .2s;
+}
+.tech-chip:hover { border-color: var(--accent); background: var(--surface2); }
+.tech-chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* ===== Download ===== */
+.download { padding: 100px 0; }
+.download-card {
+  max-width: 640px; margin: 0 auto; text-align: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 48px 40px; position: relative; overflow: hidden;
+}
+.download-card::before {
+  content: ''; position: absolute; top: -1px; left: 0; right: 0; height: 3px;
+  background: var(--gradient1);
+}
+.download-card h3 { font-size: 1.5rem; font-weight: 700; margin-bottom: 8px; }
+.download-card p { color: var(--text2); margin-bottom: 32px; }
+.download-links { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.dl-row {
+  display: flex; align-items: center; gap: 16px; width: 100%; max-width: 420px;
+  padding: 14px 20px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; transition: border-color .3s;
+}
+.dl-row:hover { border-color: var(--accent); }
+.dl-icon { font-size: 1.4rem; width: 36px; text-align: center; flex-shrink: 0; }
+.dl-info { text-align: left; flex: 1; }
+.dl-info .name { font-weight: 600; font-size: .92rem; }
+.dl-info .meta { font-size: .78rem; color: var(--text2); }
+.dl-btn {
+  padding: 7px 18px; border-radius: 8px; font-size: .82rem; font-weight: 600;
+  background: var(--gradient2); color: #fff; flex-shrink: 0; transition: transform .15s;
+}
+.dl-btn:hover { transform: scale(1.04); color: #fff; }
+.dl-divider { color: var(--text2); font-size: .82rem; margin: 4px 0; }
+
+/* ===== Shortcuts ===== */
+.shortcuts { padding: 60px 0 100px; }
+.kb-grid { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; max-width: 640px; margin: 0 auto; }
+.kb-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  min-width: 200px;
+}
+.kb-key {
+  display: inline-flex; align-items: center; padding: 4px 10px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+  font-family: monospace; font-size: .82rem; font-weight: 600; color: var(--accent);
+  white-space: nowrap;
+}
+.kb-desc { font-size: .88rem; color: var(--text2); }
+
+/* ===== Footer ===== */
+footer {
+  border-top: 1px solid var(--border); padding: 40px 0; text-align: center;
+}
+footer p { color: var(--text2); font-size: .85rem; }
+footer .heart { color: #f85149; }
+footer a { color: var(--accent); }
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .hero h1 { font-size: 2.4rem; }
+  .hero p { font-size: 1rem; }
+  .hero-stats { gap: 28px; }
+  .nav-links { display: none; }
+  .features-grid { grid-template-columns: 1fr; }
+  .arch-row { flex-direction: column; align-items: center; }
+  .arch-box { max-width: 100%; }
+  .download-card { padding: 32px 20px; }
+}
+
+/* ===== Scroll Animation ===== */
+.fade-up {
+  opacity: 0; transform: translateY(30px);
+  transition: opacity .6s ease, transform .6s ease;
+}
+.fade-up.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="container">
+    <div class="nav-brand">
+      <img src="pygit_icon.png" alt="PyGit" style="width:32px;height:32px;border-radius:6px;">
+      PyGit
+    </div>
+    <div class="nav-links">
+      <a href="#features">功能</a>
+      <a href="#architecture">架构</a>
+      <a href="#tech">技术栈</a>
+      <a href="#download">下载</a>
+    </div>
+    <a href="https://github.com/HLJ-GitHyb/PyGit" target="_blank" class="nav-gh">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <span class="badge hero-badge">v1.0.0 &middot; 开源免费</span>
+    <h1>用图形界面<br>驾驭 <span>Git</span> 的全部能力</h1>
+    <p>基于 Python + Tkinter 构建的全功能 Git 客户端<br>零外部依赖，开箱即用</p>
+    <div class="hero-btns">
+      <a href="#download" class="btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        立即下载
+      </a>
+      <a href="https://github.com/HLJ-GitHyb/PyGit" target="_blank" class="btn-secondary">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        查看源码
+      </a>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="num">8</div><div class="label">功能模块</div></div>
+      <div class="hero-stat"><div class="num">20+</div><div class="label">Git 操作</div></div>
+      <div class="hero-stat"><div class="num">0</div><div class="label">外部依赖</div></div>
+      <div class="hero-stat"><div class="num">MIT</div><div class="label">开源许可</div></div>
+    </div>
+
+    <!-- Terminal Mock -->
+    <div class="mock-window fade-up">
+      <div class="mock-titlebar">
+        <div class="mock-dot r"></div><div class="mock-dot y"></div><div class="mock-dot g"></div>
+        <span>PyGit — 终端输出</span>
+      </div>
+      <div class="mock-body">
+        <div class="line"><span class="prompt">$</span> <span class="cmd">git</span> <span class="flag">init</span> <span class="str">my-project</span></div>
+        <div class="line"><span class="ok">✓ 已初始化空 Git 仓库于 G:/my-project/.git/</span></div>
+        <div class="line"><span class="prompt">$</span> <span class="cmd">git</span> <span class="flag">add</span> <span class="str">.</span></div>
+        <div class="line"><span class="ok">✓ 已暂存 12 个文件</span></div>
+        <div class="line"><span class="prompt">$</span> <span class="cmd">git</span> <span class="flag">commit</span> <span class="flag">-m</span> <span class="str">"Initial commit"</span></div>
+        <div class="line"><span class="hl">[main (root-commit) a3f7b2c] Initial commit</span></div>
+        <div class="line"><span class="comment"> 12 files changed, 1,024 insertions(+)</span></div>
+        <div class="line"><span class="prompt">$</span> <span class="cmd">git</span> <span class="flag">push</span> <span class="flag">origin</span> <span class="str">main</span></div>
+        <div class="line"><span class="ok">✓ 推送成功 → origin/main</span><span class="typing-cursor"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features" id="features">
+  <div class="container">
+    <h2 class="section-title fade-up">全功能覆盖</h2>
+    <p class="section-sub fade-up">覆盖日常 Git 工作流的每一个环节，从初始化到推送，一站式完成</p>
+    <div class="features-grid">
+      <div class="feature-card fade-up">
+        <div class="feature-icon blue">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </div>
+        <h3>仓库管理</h3>
+        <p>初始化新仓库、克隆远程仓库、打开本地已有仓库，一站完成仓库级操作。</p>
+        <span class="feature-tag">init · clone · open</span>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon green">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <h3>文件操作</h3>
+        <p>暂存、取消暂存、丢弃更改、差异对比，文件状态一目了然。</p>
+        <span class="feature-tag">add · reset · checkout · diff</span>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon purple">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/></svg>
+        </div>
+        <h3>提交管理</h3>
+        <p>提交变更、查看历史、搜索记录、详情查看、回退与撤销，完整掌控每一次提交。</p>
+        <span class="feature-tag">commit · log · show · reset · revert</span>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon orange">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 01-9 9"/></svg>
+        </div>
+        <h3>分支管理</h3>
+        <p>创建、删除、切换分支，合并代码，可视化管理分支拓扑。</p>
+        <span class="feature-tag">branch · checkout · merge</span>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon teal">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
+        </div>
+        <h3>远程操作</h3>
+        <p>拉取、推送、获取远程更新，管理远程仓库配置，与团队协作无缝衔接。</p>
+        <span class="feature-tag">pull · push · fetch · remote</span>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon pink">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+        </div>
+        <h3>暂存管理</h3>
+        <p>快速保存工作现场、随时恢复，切换分支不再丢失未完成的修改。</p>
+        <span class="feature-tag">stash push · stash pop</span>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon yellow">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        </div>
+        <h3>标签管理</h3>
+        <p>在关键提交处创建标签、删除标签，精准标记版本里程碑。</p>
+        <span class="feature-tag">tag · tag -d</span>
+      </div>
+      <div class="feature-card fade-up">
+        <div class="feature-icon red">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        </div>
+        <h3>内置终端</h3>
+        <p>执行自定义 Git 命令，彩色输出实时反馈，保留完整命令历史。</p>
+        <span class="feature-tag">自定义命令 · 彩色输出</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section class="architecture" id="architecture">
+  <div class="container">
+    <h2 class="section-title fade-up">Git 三棵树架构</h2>
+    <p class="section-sub fade-up">深度理解 Git 工作原理，基于工作区 → 暂存区 → 本地仓库的三棵树模型构建</p>
+    <div class="arch-diagram fade-up">
+      <div class="arch-row">
+        <div class="arch-box">
+          <div class="icon">📁</div>
+          <h4>工作区</h4>
+          <p>Working Tree</p>
+          <p style="margin-top:6px;font-size:.72rem;color:var(--text2)">你正在编辑的文件</p>
+        </div>
+        <div class="arch-box" style="border-color:var(--accent)">
+          <div class="icon">📋</div>
+          <h4>暂存区</h4>
+          <p>Index / Staging</p>
+          <p style="margin-top:6px;font-size:.72rem;color:var(--text2)">准备提交的变更快照</p>
+        </div>
+        <div class="arch-box" style="border-color:var(--accent2)">
+          <div class="icon">🗄️</div>
+          <h4>本地仓库</h4>
+          <p>HEAD / Repository</p>
+          <p style="margin-top:6px;font-size:.72rem;color:var(--text2)">已提交的完整历史</p>
+        </div>
+      </div>
+      <div class="arch-connector">
+        <svg viewBox="0 0 200 28" fill="none">
+          <defs>
+            <marker id="ah1" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0 0L6 3L0 6Z" fill="#58a6ff"/></marker>
+            <marker id="ah2" markerWidth="6" markerHeight="6" refX="1" refY="3" orient="auto"><path d="M6 0L0 3L6 6Z" fill="#3fb950"/></marker>
+          </defs>
+          <line x1="10" y1="10" x2="90" y2="10" stroke="#58a6ff" stroke-width="2" marker-end="url(#ah1)"/>
+          <text x="50" y="7" fill="#58a6ff" font-size="8" text-anchor="middle" font-family="monospace">git add</text>
+          <line x1="110" y1="10" x2="190" y2="10" stroke="#58a6ff" stroke-width="2" marker-end="url(#ah1)"/>
+          <text x="150" y="7" fill="#58a6ff" font-size="8" text-anchor="middle" font-family="monospace">git commit</text>
+          <line x1="190" y1="20" x2="10" y2="20" stroke="#3fb950" stroke-width="2" marker-end="url(#ah2)"/>
+          <text x="100" y="26" fill="#3fb950" font-size="8" text-anchor="middle" font-family="monospace">git checkout</text>
+        </svg>
+      </div>
+      <p style="color:var(--text2);font-size:.85rem;margin-top:8px;text-align:center">
+        所有 Git 操作通过 <code style="color:var(--accent);background:rgba(88,166,255,.1);padding:2px 6px;border-radius:4px">GitRunner</code> 封装层执行，保证命令安全性和超时处理
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- Tech Stack -->
+<section class="tech" id="tech">
+  <div class="container">
+    <h2 class="section-title fade-up">技术栈</h2>
+    <p class="section-sub fade-up">纯 Python 实现，最少的依赖，最大的兼容性</p>
+    <div class="tech-grid fade-up">
+      <div class="tech-chip"><div class="dot" style="background:#3572A5"></div>Python 3</div>
+      <div class="tech-chip"><div class="dot" style="background:#e34c26"></div>Tkinter GUI</div>
+      <div class="tech-chip"><div class="dot" style="background:#f05133"></div>Git CLI</div>
+      <div class="tech-chip"><div class="dot" style="background:#58a6ff"></div>Pillow</div>
+      <div class="tech-chip"><div class="dot" style="background:#d29922"></div>PyInstaller</div>
+      <div class="tech-chip"><div class="dot" style="background:#3fb950"></div>Windows / macOS / Linux</div>
+    </div>
+  </div>
+</section>
+
+<!-- Download -->
+<section class="download" id="download">
+  <div class="container">
+    <h2 class="section-title fade-up">下载 PyGit</h2>
+    <p class="section-sub fade-up">选择你偏好的方式获取，即刻开始使用</p>
+    <div class="download-card fade-up">
+      <h3>PyGit v1.0.0</h3>
+      <p>稳定版 · MIT License · 全平台支持</p>
+      <div class="download-links">
+        <a href="https://github.com/HLJ-GitHyb/PyGit" target="_blank" class="dl-row">
+          <div class="dl-icon">
+            <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          </div>
+          <div class="dl-info">
+            <div class="name">GitHub 仓库</div>
+            <div class="meta">获取源码 · Star & Fork</div>
+          </div>
+          <span class="dl-btn">访问</span>
+        </a>
+        <div class="dl-divider">— 或从网盘下载 —</div>
+        <a href="https://pan.baidu.com/s/1cQwFOIDAoXj-OU7CzblnUw?pwd=ivvw" target="_blank" class="dl-row">
+          <div class="dl-icon">💙</div>
+          <div class="dl-info">
+            <div class="name">百度网盘</div>
+            <div class="meta">提取码: ivvw</div>
+          </div>
+          <span class="dl-btn">下载</span>
+        </a>
+        <a href="https://pan.quark.cn/s/4274c7e1da92?pwd=bMwy" target="_blank" class="dl-row">
+          <div class="dl-icon">💜</div>
+          <div class="dl-info">
+            <div class="name">夸克网盘</div>
+            <div class="meta">提取码: bMwy</div>
+          </div>
+          <span class="dl-btn">下载</span>
+        </a>
+        <a href="https://wwalq.lanzoum.com/iF3Qf4e7nsob" target="_blank" class="dl-row">
+          <div class="dl-icon">🩵</div>
+          <div class="dl-info">
+            <div class="name">蓝奏云</div>
+            <div class="meta">密码: 8uej</div>
+          </div>
+          <span class="dl-btn">下载</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Shortcuts -->
+<section class="shortcuts">
+  <div class="container">
+    <h2 class="section-title fade-up">快捷键</h2>
+    <p class="section-sub fade-up">高效操作，触手可及</p>
+    <div class="kb-grid fade-up">
+      <div class="kb-item"><span class="kb-key">Ctrl+O</span><span class="kb-desc">打开仓库</span></div>
+      <div class="kb-item"><span class="kb-key">Ctrl+S</span><span class="kb-desc">提交</span></div>
+      <div class="kb-item"><span class="kb-key">Ctrl+D</span><span class="kb-desc">查看差异</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="container">
+    <p style="margin-bottom:8px">PyGit v1.0.0 &middot; Made with <span class="heart">♥</span> using Python + Tkinter</p>
+    <p>&copy; 2026 <a href="https://github.com/HLJ-GitHyb" target="_blank">HLJ-GitHyb</a> &middot; <a href="https://github.com/HLJ-GitHyb/PyGit/blob/main/LICENSE" target="_blank">MIT License</a></p>
+  </div>
+</footer>
+
+<script>
+// Scroll fade-in animation
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+// Smooth scroll for nav links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', function (e) {
+    e.preventDefault();
+    const target = document.querySelector(this.getAttribute('href'));
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+</script>
+</body>
+</html>
